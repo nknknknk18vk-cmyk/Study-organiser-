@@ -1,0 +1,6 @@
+{
+  "name": "Smart Study Companion",
+  "description": "An advanced EdTech study assistant with a Daily Newspaper, gamified Vocabulary engine, live Class tracker, and collaborative AI chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
