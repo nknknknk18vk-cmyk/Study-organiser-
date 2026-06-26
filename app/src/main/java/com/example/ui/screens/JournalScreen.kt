@@ -184,6 +184,14 @@ fun JournalScreen(
                 )
             }
 
+            // AI Doubt Solver Section
+            item {
+                NewspaperDoubtSolverView(
+                    article = article,
+                    viewModel = viewModel
+                )
+            }
+
             // Word definition overlay block
             viewModel.activeVocabWordDefinition?.let { vocab ->
                 item {
@@ -656,6 +664,235 @@ fun QuizSectionView(
                     ) {
                         Text("Try Again", fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewspaperDoubtSolverView(
+    article: GeneratedNewspaperArticle,
+    viewModel: StudyViewModel
+) {
+    val doubtHistory = viewModel.newspaperDoubtHistory
+    val isResponding = viewModel.isNewspaperAgentResponding
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp, bottom = 16.dp)
+            .testTag("newspaper_doubt_solver_card"),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MintGreen.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        tint = MintGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "AI Article Assistant & Doubt Solver",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Ask questions, clear doubts, or explore real-world use cases",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Suggestions Row
+            Text(
+                text = "Quick Queries:",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val suggestions = listOf(
+                    "Summarize simply" to "Summarize the key takeaways of this article in 3 simple sentences.",
+                    "Give analogy" to "Explain the core concept of this article using a fun real-world analogy.",
+                    "Why does this matter?" to "Why is the topic discussed in this article important to understand for modern technology?",
+                    "Generate quiz" to "Generate a quick conceptual question for me based on this article."
+                )
+                suggestions.forEach { (label, query) ->
+                    Card(
+                        modifier = Modifier
+                            .clickable(enabled = !isResponding) {
+                                viewModel.askNewspaperDoubtPredefined(query)
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MintGreen.copy(alpha = 0.25f)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f))
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Chat Feed Section (if history is not empty)
+            if (doubtHistory.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f))
+                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                ) {
+                    val scrollState = rememberScrollState()
+                    LaunchedEffect(doubtHistory.size) {
+                        scrollState.animateScrollTo(scrollState.maxValue)
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        doubtHistory.forEach { msg ->
+                            val isMe = msg.sender == "You"
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start
+                            ) {
+                                Card(
+                                    shape = RoundedCornerShape(
+                                        topStart = 12.dp,
+                                        topEnd = 12.dp,
+                                        bottomStart = if (isMe) 12.dp else 0.dp,
+                                        bottomEnd = if (isMe) 0.dp else 12.dp
+                                    ),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer else MintGreen.copy(alpha = 0.08f)
+                                    ),
+                                    border = if (isMe) null else BorderStroke(1.dp, MintGreen.copy(alpha = 0.15f)),
+                                    modifier = Modifier.widthIn(max = 280.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text(
+                                            text = if (isMe) "You" else "AI Assistant ✨",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp,
+                                            color = if (isMe) MaterialTheme.colorScheme.onPrimaryContainer else MintGreen
+                                        )
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = msg.text,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (isResponding) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(4.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = MintGreen,
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Text(
+                                        text = "AI Agent is compiling response...",
+                                        fontSize = 11.sp,
+                                        fontStyle = FontStyle.Italic,
+                                        color = MintGreen
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
+            // Input Field Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = viewModel.newspaperDoubtInput,
+                    onValueChange = { viewModel.newspaperDoubtInput = it },
+                    placeholder = { Text("Ask any question on this article...", fontSize = 12.sp) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("newspaper_doubt_input"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MintGreen,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    ),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { viewModel.sendNewspaperDoubt() }),
+                    enabled = !isResponding
+                )
+                IconButton(
+                    onClick = { viewModel.sendNewspaperDoubt() },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isResponding || viewModel.newspaperDoubtInput.isBlank()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f) else MintGreen)
+                        .testTag("newspaper_doubt_send_btn"),
+                    enabled = !isResponding && viewModel.newspaperDoubtInput.isNotBlank()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Send",
+                        tint = if (isResponding || viewModel.newspaperDoubtInput.isBlank()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f) else PureMidnight,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

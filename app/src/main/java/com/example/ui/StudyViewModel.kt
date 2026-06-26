@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.runtime.mutableStateListOf
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +49,11 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     var isGeneratingArticle by mutableStateOf(false)
     var activeVocabWordDefinition by mutableStateOf<NewspaperVocabItem?>(null)
 
+    // AI Newspaper Assistant state
+    var newspaperDoubtInput by mutableStateOf("")
+    val newspaperDoubtHistory = mutableStateListOf<ChatMessage>()
+    var isNewspaperAgentResponding by mutableStateOf(false)
+
     // Active Quiz states
     var activeQuizQuestionIndex by mutableStateOf(0)
     var selectedQuizOptionIndex by mutableStateOf<Int?>(null)
@@ -58,6 +64,10 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     // Chat states
     var chatInput by mutableStateOf("")
     var isAiTutorResponding by mutableStateOf(false)
+    
+    // Private 1-on-1 AI Doubt Solver state
+    var chatTab by mutableStateOf("group") // "group" or "tutor"
+    val privateTutorMessages = mutableStateListOf<ChatMessage>()
 
     // Notes states
     var noteTitleInput by mutableStateOf("")
@@ -86,6 +96,15 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         activeArticle = repository.articles.value.firstOrNull()
+        // Seed 1-on-1 private AI Tutor doubt solving
+        privateTutorMessages.add(
+            ChatMessage(
+                sender = "AI Doubt Solver ✨",
+                text = "Hello! I am your 1-on-1 AI Doubt Solver. Ask me any study questions, paste complex text to simplify, or request a customized quiz on any subject!",
+                isFromAi = true,
+                isAiTutor = true
+            )
+        )
     }
 
     private fun getTodayDateString(): String {
@@ -106,6 +125,8 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
         isQuizAnswerCorrect = null
         showQuizResult = false
         quizScore = 0
+        // Clear newspaper assistant chat history on article switch
+        newspaperDoubtHistory.clear()
     }
 
     fun generateNewspaperArticle() {
@@ -374,5 +395,167 @@ class StudyViewModel(application: Application) : AndroidViewModel(application) {
     fun closePiPPlayer() {
         showPiPPlayer = false
         activeClassStream = null
+    }
+
+    // --- AI Newspaper Assistant Doubt Solver ---
+    fun sendNewspaperDoubt() {
+        val question = newspaperDoubtInput.trim()
+        val article = activeArticle ?: return
+        if (question.isBlank()) return
+
+        newspaperDoubtInput = ""
+        newspaperDoubtHistory.add(ChatMessage(sender = "You", text = question))
+        isNewspaperAgentResponding = true
+
+        viewModelScope.launch {
+            val historyText = newspaperDoubtHistory.joinToString("\n") { "${it.sender}: ${it.text}" }
+            val prompt = """
+                You are an expert academic tutor and doubt-solving agent. The student is reading a newspaper article titled "${article.title}".
+                
+                ARTICLE CONTENT:
+                ${article.content}
+                
+                CONVERSATION HISTORY:
+                $historyText
+                
+                NEW STUDENT DOUBT/QUESTION:
+                $question
+                
+                Solve the student's doubt directly and clearly using the article context if possible, or your broad academic expertise. Keep the explanation engaging, concise (under 5 sentences), and highly educational. Use bullet points if appropriate.
+            """.trimIndent()
+
+            val response = GeminiService.generateText(prompt, "You are @AI_Tutor, an enthusiastic, expert study coach helping students solve doubts about their active reading material.")
+            val answer = response ?: "I'm having trouble connecting to my knowledge base. Please check your network and try again!"
+            
+            newspaperDoubtHistory.add(
+                ChatMessage(
+                    sender = "AI Agent ✨",
+                    text = answer,
+                    isFromAi = true,
+                    isAiTutor = true
+                )
+            )
+            isNewspaperAgentResponding = false
+        }
+    }
+
+    fun askNewspaperDoubtPredefined(question: String) {
+        val article = activeArticle ?: return
+        newspaperDoubtHistory.add(ChatMessage(sender = "You", text = question))
+        isNewspaperAgentResponding = true
+
+        viewModelScope.launch {
+            val historyText = newspaperDoubtHistory.joinToString("\n") { "${it.sender}: ${it.text}" }
+            val prompt = """
+                You are an expert academic tutor and doubt-solving agent. The student is reading a newspaper article titled "${article.title}".
+                
+                ARTICLE CONTENT:
+                ${article.content}
+                
+                CONVERSATION HISTORY:
+                $historyText
+                
+                NEW STUDENT DOUBT/QUESTION:
+                $question
+                
+                Solve the student's doubt directly and clearly using the article context if possible, or your broad academic expertise. Keep the explanation engaging, concise (under 5 sentences), and highly educational. Use bullet points if appropriate.
+            """.trimIndent()
+
+            val response = GeminiService.generateText(prompt, "You are @AI_Tutor, an enthusiastic, expert study coach helping students solve doubts about their active reading material.")
+            val answer = response ?: "I'm having trouble connecting to my knowledge base. Please check your network and try again!"
+            
+            newspaperDoubtHistory.add(
+                ChatMessage(
+                    sender = "AI Agent ✨",
+                    text = answer,
+                    isFromAi = true,
+                    isAiTutor = true
+                )
+            )
+            isNewspaperAgentResponding = false
+        }
+    }
+
+    // --- Private 1-on-1 AI Tutor Operations ---
+    fun sendPrivateTutorMessage() {
+        val question = chatInput.trim()
+        if (question.isBlank()) return
+
+        chatInput = ""
+        privateTutorMessages.add(ChatMessage(sender = "You", text = question))
+        isAiTutorResponding = true
+
+        viewModelScope.launch {
+            val historyText = privateTutorMessages.joinToString("\n") { "${it.sender}: ${it.text}" }
+            val prompt = """
+                You are a dedicated 1-on-1 AI Doubt Solver, academic mentor, and study coach. The student is chatting with you in a private doubt-clearing session.
+                
+                CONVERSATION HISTORY:
+                $historyText
+                
+                NEW STUDENT QUESTION/DOUBT:
+                $question
+                
+                Provide a friendly, structured, and deep step-by-step academic explanation to solve their doubt. Use bullet points, bolding, and formatting to make it easy to follow. If appropriate, suggest a follow-up practice problem or custom quiz question! Keep the response highly encouraging.
+            """.trimIndent()
+
+            val response = GeminiService.generateText(prompt, "You are a friendly, world-class private AI Tutor who simplifies complex concepts and clears academic doubts for students.")
+            val answer = response ?: "I had a small hiccup trying to process that. Let's try again! What other doubts do you have?"
+
+            privateTutorMessages.add(
+                ChatMessage(
+                    sender = "AI Doubt Solver ✨",
+                    text = answer,
+                    isFromAi = true,
+                    isAiTutor = true
+                )
+            )
+            isAiTutorResponding = false
+        }
+    }
+
+    fun askPrivateTutorPredefined(question: String) {
+        privateTutorMessages.add(ChatMessage(sender = "You", text = question))
+        isAiTutorResponding = true
+
+        viewModelScope.launch {
+            val historyText = privateTutorMessages.joinToString("\n") { "${it.sender}: ${it.text}" }
+            val prompt = """
+                You are a dedicated 1-on-1 AI Doubt Solver, academic mentor, and study coach. The student is chatting with you in a private doubt-clearing session.
+                
+                CONVERSATION HISTORY:
+                $historyText
+                
+                NEW STUDENT QUESTION/DOUBT:
+                $question
+                
+                Provide a friendly, structured, and deep step-by-step academic explanation to solve their doubt. Use bullet points, bolding, and formatting to make it easy to follow. If appropriate, suggest a follow-up practice problem or custom quiz question! Keep the response highly encouraging.
+            """.trimIndent()
+
+            val response = GeminiService.generateText(prompt, "You are a friendly, world-class private AI Tutor who simplifies complex concepts and clears academic doubts for students.")
+            val answer = response ?: "I had a small hiccup trying to process that. Let's try again! What other doubts do you have?"
+
+            privateTutorMessages.add(
+                ChatMessage(
+                    sender = "AI Doubt Solver ✨",
+                    text = answer,
+                    isFromAi = true,
+                    isAiTutor = true
+                )
+            )
+            isAiTutorResponding = false
+        }
+    }
+
+    fun clearPrivateTutorHistory() {
+        privateTutorMessages.clear()
+        privateTutorMessages.add(
+            ChatMessage(
+                sender = "AI Doubt Solver ✨",
+                text = "Session cleared! Ask me any study doubts, or ask me to explain a concept in depth.",
+                isFromAi = true,
+                isAiTutor = true
+            )
+        )
     }
 }

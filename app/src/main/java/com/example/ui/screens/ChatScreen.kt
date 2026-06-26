@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,82 +63,262 @@ fun ChatScreen(
                 .fillMaxSize()
                 .blur(blurRadius)
         ) {
-            // Chat Info Bar
-            Card(
-                modifier = Modifier.fillMaxWidth().testTag("chat_header_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            // Segmented Tab Selector to switch between Group Chat and 1-on-1 Doubt Solver
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                listOf(
+                    "group" to "👥 Group Study Pod",
+                    "tutor" to "✨ 1-on-1 Doubt Solver"
+                ).forEach { (tabId, tabName) ->
+                    val isSelected = viewModel.chatTab == tabId
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) MintGreen else Color.Transparent)
+                            .clickable { viewModel.chatTab = tabId }
+                            .padding(vertical = 10.dp)
+                            .testTag("chat_tab_$tabId"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = tabName,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSelected) PureMidnight else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+
+            if (viewModel.chatTab == "group") {
+                // --- Group Chat Info Bar ---
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("chat_header_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Default.Group, contentDescription = null, tint = MintGreen)
-                        Column {
-                            Text("Study Pod: Alpha", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Text("Active: You, Chloe, @AI_Tutor", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Group, contentDescription = null, tint = MintGreen)
+                            Column {
+                                Text("Study Pod: Alpha", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text("Active: You, Chloe, @AI_Tutor", fontSize = 11.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearChatHistory() },
+                            modifier = Modifier.testTag("clear_chat_btn")
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = Color.Red)
                         }
                     }
-                    IconButton(
-                        onClick = { viewModel.clearChatHistory() },
-                        modifier = Modifier.testTag("clear_chat_btn")
-                    ) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Chat", tint = Color.Red)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Chat Feed List
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(chatHistory) { message ->
-                    ChatBubble(message = message)
                 }
 
-                if (viewModel.isAiTutorResponding) {
-                    item {
-                        AiTypingIndicator()
-                    }
-                }
-            }
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Message Input bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = viewModel.chatInput,
-                    onValueChange = { viewModel.chatInput = it },
-                    placeholder = { Text("Ask @AI_Tutor or chat with pod...") },
-                    modifier = Modifier.weight(1f).testTag("chat_input_field"),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MintGreen,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
-                    ),
-                    maxLines = 3
-                )
-                FloatingActionButton(
-                    onClick = { viewModel.sendChatMessage() },
-                    modifier = Modifier.size(52.dp).testTag("send_chat_btn"),
-                    containerColor = MintGreen,
-                    contentColor = PureMidnight,
-                    shape = RoundedCornerShape(26.dp)
+                // Chat Feed List
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                    items(chatHistory) { message ->
+                        ChatBubble(message = message)
+                    }
+
+                    if (viewModel.isAiTutorResponding) {
+                        item {
+                            AiTypingIndicator()
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Message Input bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.chatInput,
+                        onValueChange = { viewModel.chatInput = it },
+                        placeholder = { Text("Ask @AI_Tutor or chat with pod...") },
+                        modifier = Modifier.weight(1f).testTag("chat_input_field"),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MintGreen,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                        ),
+                        maxLines = 3,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { viewModel.sendChatMessage() })
+                    )
+                    FloatingActionButton(
+                        onClick = { viewModel.sendChatMessage() },
+                        modifier = Modifier.size(52.dp).testTag("send_chat_btn"),
+                        containerColor = MintGreen,
+                        contentColor = PureMidnight,
+                        shape = RoundedCornerShape(26.dp)
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                    }
+                }
+            } else {
+                // --- 1-on-1 AI Tutor Private Layout ---
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("tutor_header_card"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SoftOrange.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = SoftOrange, modifier = Modifier.size(16.dp))
+                            }
+                            Column {
+                                Text("Private AI Doubt Solver", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Text("Powered by Gemini Agent • Online", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f))
+                            }
+                        }
+                        IconButton(
+                            onClick = { viewModel.clearPrivateTutorHistory() },
+                            modifier = Modifier.testTag("clear_tutor_chat_btn")
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear Session", tint = Color.Red)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Chat Feed List (Private)
+                val privateListState = rememberLazyListState()
+                LaunchedEffect(viewModel.privateTutorMessages.size) {
+                    if (viewModel.privateTutorMessages.isNotEmpty()) {
+                        privateListState.animateScrollToItem(viewModel.privateTutorMessages.size - 1)
+                    }
+                }
+
+                LazyColumn(
+                    state = privateListState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(viewModel.privateTutorMessages) { message ->
+                        ChatBubble(message = message)
+                    }
+
+                    if (viewModel.isAiTutorResponding) {
+                        item {
+                            AiTypingIndicator()
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Predefined Suggestion Chips for Tutor Chat
+                Text(
+                    text = "Doubt Starters:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val suggestions = listOf(
+                        "🧬 Quantum Wave Concept" to "Can you explain Quantum Wave-Particle Duality in simple terms?",
+                        "🧪 Organic Chem Quiz" to "Give me a quick 1-question practice quiz on Organic Chemistry and check my answer.",
+                        "📚 Study Planner" to "Help me design a 3-step active recall study plan for an upcoming computer science exam.",
+                        "📐 Calculus derivative" to "Explain the chain rule in calculus and give me a simple example."
+                    )
+                    suggestions.forEach { (label, query) ->
+                        Card(
+                            modifier = Modifier
+                                .clickable(enabled = !viewModel.isAiTutorResponding) {
+                                    viewModel.askPrivateTutorPredefined(query)
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, SoftOrange.copy(alpha = 0.25f)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Message Input bar (Private)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = viewModel.chatInput,
+                        onValueChange = { viewModel.chatInput = it },
+                        placeholder = { Text("Ask doubt to Private AI Solver...") },
+                        modifier = Modifier.weight(1f).testTag("tutor_chat_input_field"),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MintGreen,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                        ),
+                        maxLines = 3,
+                        enabled = !viewModel.isAiTutorResponding,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = { viewModel.sendPrivateTutorMessage() })
+                    )
+                    FloatingActionButton(
+                        onClick = { if (!viewModel.isAiTutorResponding && viewModel.chatInput.isNotBlank()) viewModel.sendPrivateTutorMessage() },
+                        modifier = Modifier.size(52.dp).testTag("send_tutor_chat_btn"),
+                        containerColor = if (viewModel.isAiTutorResponding || viewModel.chatInput.isBlank()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f) else MintGreen,
+                        contentColor = if (viewModel.isAiTutorResponding || viewModel.chatInput.isBlank()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f) else PureMidnight,
+                        shape = RoundedCornerShape(26.dp)
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
